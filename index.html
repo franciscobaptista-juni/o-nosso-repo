@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calendário de prioritização | JUNITEC</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:#175FAA;color:#F6F6F6;font-family:'Montserrat',Arial,sans-serif;font-weight:400;line-height:1.5}
+.pagina{max-width:980px;margin:0 auto;padding:32px 20px 24px}
+h1{font-weight:700;font-size:28px;margin:0 0 8px}
+.barra{width:120px;height:6px;border-radius:3px;background:#74D1EF;margin:0 0 16px}
+.intro{color:#E2EEFF;margin:0 0 24px}
+.cartao{background:#F6F6F6;color:#3D4F6B;border-radius:12px;padding:20px;margin-bottom:20px}
+h2{color:#175FAA;font-weight:700;font-size:18px;margin:0 0 12px}
+label{font-size:12px;font-weight:600;display:block;margin-bottom:3px}
+input,select{font-family:inherit;font-size:14px;color:#3D4F6B;background:#fff;border:1px solid #C9DAEE;border-radius:8px;padding:8px 10px;width:100%}
+input:focus,select:focus,button:focus-visible{outline:2px solid #175FAA;outline-offset:1px}
+.dev{display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end;padding:8px 0;border-bottom:1px solid #C9DAEE}
+.tar{display:grid;grid-template-columns:1.4fr 2fr .7fr 1.3fr auto;gap:10px;align-items:end;padding:10px 0;border-bottom:1px solid #C9DAEE}
+button{font-family:inherit;font-size:14px;font-weight:600;border:0;border-radius:8px;padding:10px 16px;cursor:pointer}
+.primario{background:#74D1EF;color:#0944A1}
+.secundario{background:#fff;color:#175FAA;border:1px solid #175FAA}
+.remover{background:#fff;color:#175FAA;border:1px solid #C9DAEE;padding:9px 12px}
+.acoes{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.nota{font-size:12px;margin:12px 0 0}
+.aviso{background:#fff;border:1px solid #175FAA;border-radius:8px;padding:10px 12px;margin-top:12px;font-size:13px;font-weight:600;color:#175FAA}
+.resultado{background:#175FAA;border:1px solid #4D85C2;border-radius:12px;padding:20px;margin-bottom:20px}
+.grande{color:#74D1EF;font-size:38px;font-weight:800;line-height:1.2}
+.sub{color:#E2EEFF;font-size:14px;margin-top:4px}
+.cal{overflow-x:auto;margin-top:6px}
+table{border-collapse:collapse;font-size:12px;min-width:100%}
+th,td{border:1px solid #C9DAEE;padding:4px;vertical-align:top;min-width:88px}
+th{background:#E2EEFF;color:#175FAA;font-weight:600}
+th.dev-n,td.dev-n{min-width:110px;font-weight:600;color:#175FAA;background:#fff}
+.chip{border-radius:6px;padding:3px 6px;margin-bottom:3px;font-weight:600}
+.c0{background:#74D1EF;color:#0944A1}.c1{background:#E2EEFF;color:#175FAA;border:1px solid #4D85C2}.c2{background:#C9DAEE;color:#3D4F6B}
+ol.ordem{margin:0;padding-left:22px}
+ol.ordem li{padding:4px 0;border-bottom:1px solid #C9DAEE}
+footer{font-size:12px;color:#E2EEFF;text-align:center;margin-top:24px}
+@media (max-width:640px){
+ .pagina{padding:24px 16px}
+ .dev,.tar{grid-template-columns:1fr 1fr}
+ .dev > :first-child,.tar > :nth-child(1),.tar > :nth-child(2){grid-column:1 / -1}
+ .remover{grid-column:1 / -1}
+ .grande{font-size:30px}
+}
+</style>
+</head>
+<body>
+<main class="pagina">
+ <h1>Calendário de prioritização</h1>
+ <div class="barra"></div>
+ <p class="intro">Ferramenta para consultores da JUNITEC que planeiam projectos de desenvolvimento. Junta developers e tarefas com duração e a app sugere a ordem que conclui o projecto mais cedo.</p>
+
+ <section class="cartao">
+  <h2>Developers</h2>
+  <div id="listaDev"></div>
+  <div class="acoes"><button class="primario" id="btnDev">Acrescentar developer</button></div>
+ </section>
+
+ <section class="cartao">
+  <h2>Tarefas</h2>
+  <div id="listaTar"></div>
+  <div class="acoes">
+   <button class="primario" id="btnTar">Acrescentar tarefa</button>
+   <button class="secundario" id="btnExemplo">Repor exemplo</button>
+  </div>
+  <p class="nota">Dados de exemplo, só para ilustrar. Tudo fica guardado neste browser (localStorage). Cada tarefa pode depender de uma tarefa anterior.</p>
+ </section>
+
+ <section class="cartao">
+  <h2>Início do projecto</h2>
+  <div style="max-width:200px"><label for="inicio">Data de início</label><input type="date" id="inicio"></div>
+  <p class="nota">Só contam dias úteis (segunda a sexta).</p>
+ </section>
+
+ <section class="resultado" aria-live="polite">
+  <div class="sub">Conclusão prevista</div>
+  <div class="grande" id="rData">-</div>
+  <div class="sub" id="rDias"></div>
+  <div class="sub" id="rGanho"></div>
+  <div class="acoes">
+   <button class="primario" id="btnCopiar">Copiar resultado</button>
+   <button class="primario" id="btnCsv">Exportar CSV</button>
+  </div>
+ </section>
+
+ <section class="cartao">
+  <h2>Ordem sugerida</h2>
+  <ol class="ordem" id="ordem"></ol>
+  <div id="aviso"></div>
+  <p class="nota">Regra: entre as tarefas prontas a começar, avança primeiro a que bloqueia mais trabalho a seguir (caminho crítico). Cada tarefa vai para o developer que a termina mais cedo.</p>
+ </section>
+
+ <section class="cartao">
+  <h2>Calendário</h2>
+  <div class="cal" id="cal"></div>
+ </section>
+
+ <footer>Feito pela JUNITEC</footer>
+</main>
+
+<script>
+// ---------- Estado ----------
+var CHAVE = 'junitec-calendario';
+var estado = { devs: [], tarefas: [], inicio: '', seq: 1 };
+
+function hojeISO() { return new Date().toISOString().slice(0, 10); }
+function exemplo() {
+  estado = {
+    devs: [{ nome: 'Ana (exemplo)', hdia: 6 }, { nome: 'Rui (exemplo)', hdia: 6 }, { nome: 'Marta (exemplo)', hdia: 4 }],
+    tarefas: [
+      { id: 1, nome: 'Análise de requisitos', desc: 'Reuniões com a PME', horas: 8, dep: 0 },
+      { id: 2, nome: 'Desenho da base de dados', desc: 'Modelo e esquema', horas: 10, dep: 1 },
+      { id: 3, nome: 'API de utilizadores', desc: 'Registo e autenticação', horas: 16, dep: 2 },
+      { id: 4, nome: 'Interface de login', desc: 'Ecrãs e validações', horas: 12, dep: 1 },
+      { id: 5, nome: 'Relatórios', desc: 'Exportação para PDF', horas: 14, dep: 3 },
+      { id: 6, nome: 'Documentação', desc: 'Guia para o cliente', horas: 6, dep: 0 },
+      { id: 7, nome: 'Testes finais', desc: 'Testes de aceitação', horas: 8, dep: 5 }
+    ],
+    inicio: hojeISO(), seq: 8
+  };
+}
+function guardar() { try { localStorage.setItem(CHAVE, JSON.stringify(estado)); } catch (e) {} }
+function carregar() {
+  try {
+    var d = JSON.parse(localStorage.getItem(CHAVE));
+    if (d && d.devs && d.tarefas) { estado = d; return; }
+  } catch (e) {}
+  exemplo();
+}
+
+// ---------- Cálculo ----------
+function cauda(t, memo, vis) {
+  // Trabalho em cadeia a partir desta tarefa (horas)
+  if (memo[t.id] !== undefined) return memo[t.id];
+  if (vis[t.id]) return Number(t.horas) || 0;
+  vis[t.id] = true;
+  var maior = 0;
+  estado.tarefas.forEach(function (f) {
+    if (f.dep === t.id) maior = Math.max(maior, cauda(f, memo, vis));
+  });
+  vis[t.id] = false;
+  memo[t.id] = (Number(t.horas) || 0) + maior;
+  return memo[t.id];
+}
+
+function agendar(inteligente) {
+  var devs = estado.devs.filter(function (d) { return Number(d.hdia) > 0; });
+  var pend = estado.tarefas.slice(), fim = {}, livre = devs.map(function () { return 0; }), res = [], memo = {};
+  if (!devs.length) return { itens: res, total: 0, presas: pend };
+  var existe = function (id) { return estado.tarefas.some(function (t) { return t.id === id; }); };
+  while (pend.length) {
+    var prontas = pend.filter(function (t) { return !t.dep || !existe(t.dep) || fim[t.dep] !== undefined; });
+    if (!prontas.length) break;
+    var esc = prontas[0];
+    if (inteligente) prontas.forEach(function (t) { if (cauda(t, memo, {}) > cauda(esc, memo, {})) esc = t; });
+    var depFim = (esc.dep && fim[esc.dep] !== undefined) ? fim[esc.dep] : 0, melhor = -1, mIni = 0, mFim = 1e9;
+    devs.forEach(function (d, i) {
+      var ini = Math.max(livre[i], depFim), f = ini + (Number(esc.horas) || 0) / Number(d.hdia);
+      if (f < mFim) { mFim = f; mIni = ini; melhor = i; }
+    });
+    livre[melhor] = mFim; fim[esc.id] = mFim;
+    res.push({ t: esc, dev: devs[melhor], ini: mIni, fim: mFim });
+    pend.splice(pend.indexOf(esc), 1);
+  }
+  var total = res.reduce(function (m, r) { return Math.max(m, r.fim); }, 0);
+  return { itens: res, total: total, presas: pend };
+}
+
+// ---------- Datas (só dias úteis) ----------
+function dataDoDia(i) {
+  var d = new Date((estado.inicio || hojeISO()) + 'T12:00:00');
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  for (var n = 0; n < i; n++) { d.setDate(d.getDate() + 1); while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1); }
+  return d;
+}
+function fmt(d) { return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+function fmtCurta(d) { return ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][d.getDay()] + ' ' + d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }); }
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+var plano = null;
+
+// ---------- Interface: listas ----------
+function desenharDevs() {
+  var el = document.getElementById('listaDev'); el.innerHTML = '';
+  estado.devs.forEach(function (d, i) {
+    var l = document.createElement('div'); l.className = 'dev';
+    l.innerHTML = '<div><label>Nome</label><input type="text" aria-label="Nome do developer"></div>' +
+      '<div><label>Horas por dia</label><input type="number" min="0" max="24" step="0.5" aria-label="Horas por dia"></div>' +
+      '<button class="remover">Remover</button>';
+    var c = l.querySelectorAll('input'); c[0].value = d.nome; c[1].value = d.hdia;
+    c[0].oninput = function () { d.nome = c[0].value; desenharResultado(); };
+    c[1].oninput = function () { d.hdia = c[1].value; desenharResultado(); };
+    l.querySelector('button').onclick = function () { estado.devs.splice(i, 1); desenharTudo(); };
+    el.appendChild(l);
+  });
+}
+function desenharTarefas() {
+  var el = document.getElementById('listaTar'); el.innerHTML = '';
+  estado.tarefas.forEach(function (t, i) {
+    var l = document.createElement('div'); l.className = 'tar';
+    l.innerHTML = '<div><label>Tarefa</label><input type="text" aria-label="Nome da tarefa"></div>' +
+      '<div><label>Descrição</label><input type="text" aria-label="Descrição"></div>' +
+      '<div><label>Horas</label><input type="number" min="0" step="0.5" aria-label="Horas"></div>' +
+      '<div><label>Depende de</label><select aria-label="Depende de"></select></div>' +
+      '<button class="remover">Remover</button>';
+    var c = l.querySelectorAll('input'), s = l.querySelector('select');
+    c[0].value = t.nome; c[1].value = t.desc; c[2].value = t.horas;
+    s.innerHTML = '<option value="0">Nenhuma</option>';
+    estado.tarefas.forEach(function (o) {
+      if (o.id !== t.id) s.innerHTML += '<option value="' + o.id + '">' + esc(o.nome) + '</option>';
+    });
+    s.value = String(t.dep || 0);
+    c[0].oninput = function () { t.nome = c[0].value; desenharResultado(); };
+    c[1].oninput = function () { t.desc = c[1].value; desenharResultado(); };
+    c[2].oninput = function () { t.horas = c[2].value; desenharResultado(); };
+    s.onchange = function () { t.dep = Number(s.value); desenharResultado(); };
+    l.querySelector('button').onclick = function () {
+      estado.tarefas.splice(i, 1);
+      estado.tarefas.forEach(function (o) { if (o.dep === t.id) o.dep = 0; });
+      desenharTudo();
+    };
+    el.appendChild(l);
+  });
+}
+
+// ---------- Interface: resultado e calendário ----------
+function desenharResultado() {
+  guardar();
+  plano = agendar(true);
+  var base = agendar(false);
+  var dias = Math.ceil(plano.total - 1e-9);
+  var dataEl = document.getElementById('rData');
+  if (!plano.itens.length) {
+    dataEl.textContent = '-'; document.getElementById('rDias').textContent = 'Acrescenta developers com horas por dia e tarefas.';
+    document.getElementById('rGanho').textContent = '';
+  } else {
+    dataEl.textContent = fmt(dataDoDia(Math.max(dias - 1, 0)));
+    document.getElementById('rDias').textContent = dias + (dias === 1 ? ' dia útil' : ' dias úteis') + ' de trabalho';
+    var ganho = Math.ceil(base.total - 1e-9) - dias;
+    document.getElementById('rGanho').textContent = ganho > 0
+      ? 'Poupas ' + ganho + (ganho === 1 ? ' dia' : ' dias') + ' face à ordem em que as tarefas foram escritas.'
+      : 'A ordem actual já é tão boa como a sugerida.';
+  }
+  var ol = document.getElementById('ordem'); ol.innerHTML = '';
+  plano.itens.forEach(function (r) {
+    var li = document.createElement('li');
+    li.innerHTML = '<strong>' + esc(r.t.nome) + '</strong> · ' + esc(r.dev.nome) + ' · ' + fmt(dataDoDia(Math.floor(r.ini + 1e-9))) + ' a ' + fmt(dataDoDia(Math.max(Math.ceil(r.fim - 1e-9) - 1, 0))) + ' · ' + (Number(r.t.horas) || 0) + ' h';
+    ol.appendChild(li);
+  });
+  document.getElementById('aviso').innerHTML = plano.presas.length
+    ? '<div class="aviso">Atenção: há dependências em círculo. Ficaram de fora: ' + plano.presas.map(function (t) { return esc(t.nome); }).join(', ') + '.</div>' : '';
+  desenharCalendario(dias);
+}
+function desenharCalendario(dias) {
+  var el = document.getElementById('cal');
+  if (!plano.itens.length) { el.innerHTML = ''; return; }
+  var h = '<table><thead><tr><th class="dev-n">Developer</th>';
+  for (var i = 0; i < dias; i++) h += '<th>' + fmtCurta(dataDoDia(i)) + '</th>';
+  h += '</tr></thead><tbody>';
+  estado.devs.filter(function (d) { return Number(d.hdia) > 0; }).forEach(function (d) {
+    h += '<tr><td class="dev-n">' + esc(d.nome) + '</td>';
+    for (var j = 0; j < dias; j++) {
+      h += '<td>';
+      plano.itens.forEach(function (r) {
+        if (r.dev !== d) return;
+        var ov = Math.min(r.fim, j + 1) - Math.max(r.ini, j);
+        if (ov > 1e-9) {
+          var k = estado.tarefas.indexOf(r.t) % 3;
+          h += '<div class="chip c' + k + '" title="' + esc(r.t.desc) + '">' + esc(r.t.nome) + ' · ' + (Math.round(ov * Number(d.hdia) * 10) / 10) + ' h</div>';
+        }
+      });
+      h += '</td>';
+    }
+    h += '</tr>';
+  });
+  el.innerHTML = h + '</tbody></table>';
+}
+function desenharTudo() { desenharDevs(); desenharTarefas(); desenharResultado(); }
+
+// ---------- Exportar ----------
+function textoResultado() {
+  var l = ['Conclusão prevista: ' + document.getElementById('rData').textContent + ' (' + document.getElementById('rDias').textContent + ')'];
+  plano.itens.forEach(function (r, i) {
+    l.push((i + 1) + '. ' + r.t.nome + ' - ' + r.dev.nome + ' - ' + fmt(dataDoDia(Math.floor(r.ini + 1e-9))) + ' a ' + fmt(dataDoDia(Math.max(Math.ceil(r.fim - 1e-9) - 1, 0))) + ' - ' + (Number(r.t.horas) || 0) + ' h');
+  });
+  return l.join('\n');
+}
+function copiar() {
+  var b = document.getElementById('btnCopiar'), t = textoResultado();
+  var ok = function () { b.textContent = 'Copiado!'; setTimeout(function () { b.textContent = 'Copiar resultado'; }, 1500); };
+  try { navigator.clipboard.writeText(t).then(ok, function () { fb(t); ok(); }); } catch (e) { fb(t); ok(); }
+}
+function fb(t) { var a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(a); }
+function exportarCsv() {
+  var l = ['Ordem;Tarefa;Descrição;Developer;Início;Fim;Horas'];
+  plano.itens.forEach(function (r, i) {
+    var q = function (s) { return '"' + String(s).replace(/"/g, '""') + '"'; };
+    l.push([i + 1, q(r.t.nome), q(r.t.desc), q(r.dev.nome), fmt(dataDoDia(Math.floor(r.ini + 1e-9))), fmt(dataDoDia(Math.max(Math.ceil(r.fim - 1e-9) - 1, 0))), Number(r.t.horas) || 0].join(';'));
+  });
+  var blob = new Blob(['\ufeff' + l.join('\n')], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'plano-junitec.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+
+// ---------- Ligações ----------
+document.getElementById('btnDev').onclick = function () { estado.devs.push({ nome: 'Novo developer', hdia: 6 }); desenharTudo(); };
+document.getElementById('btnTar').onclick = function () { estado.tarefas.push({ id: estado.seq++, nome: 'Nova tarefa', desc: '', horas: 4, dep: 0 }); desenharTudo(); };
+document.getElementById('btnExemplo').onclick = function () { exemplo(); document.getElementById('inicio').value = estado.inicio; desenharTudo(); };
+document.getElementById('inicio').onchange = function (e) { estado.inicio = e.target.value || hojeISO(); desenharResultado(); };
+document.getElementById('btnCopiar').onclick = copiar;
+document.getElementById('btnCsv').onclick = exportarCsv;
+
+carregar();
+document.getElementById('inicio').value = estado.inicio || hojeISO();
+desenharTudo();
+</script>
+</body>
+</html>

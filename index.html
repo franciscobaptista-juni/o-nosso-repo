@@ -30,6 +30,11 @@ button{font-family:inherit;font-size:14px;font-weight:600;border:0;border-radius
 .resultado{background:#175FAA;border:1px solid #4D85C2;border-radius:12px;padding:20px;margin-bottom:20px}
 .grande{color:#74D1EF;font-size:38px;font-weight:800;line-height:1.2}
 .sub{color:#E2EEFF;font-size:14px;margin-top:4px}
+.datas{display:grid;grid-template-columns:repeat(2,minmax(0,220px));gap:12px}
+.prazo{margin-top:12px;border-radius:8px;padding:10px 12px;font-size:14px;font-weight:600}
+.prazo[hidden]{display:none}
+.prazo.ok{background:#74D1EF;color:#0944A1}
+.prazo.mau{background:#F6F6F6;color:#175FAA;border:2px solid #74D1EF}
 .cal{overflow-x:auto;margin-top:6px}
 table{border-collapse:collapse;font-size:12px;min-width:100%}
 th,td{border:1px solid #C9DAEE;padding:4px;vertical-align:top;min-width:88px}
@@ -46,6 +51,7 @@ footer{font-size:12px;color:#E2EEFF;text-align:center;margin-top:24px}
  .dev > :first-child,.tar > :nth-child(1),.tar > :nth-child(2){grid-column:1 / -1}
  .remover{grid-column:1 / -1}
  .grande{font-size:30px}
+ .datas{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -73,8 +79,11 @@ footer{font-size:12px;color:#E2EEFF;text-align:center;margin-top:24px}
 
  <section class="cartao">
   <h2>Início do projecto</h2>
-  <div style="max-width:200px"><label for="inicio">Data de início</label><input type="date" id="inicio"></div>
-  <p class="nota">Só contam dias úteis (segunda a sexta).</p>
+  <div class="datas">
+   <div><label for="inicio">Data de início</label><input type="date" id="inicio"></div>
+   <div><label for="prazo">Prazo de entrega (opcional)</label><input type="date" id="prazo"></div>
+  </div>
+  <p class="nota">Só contam dias úteis (segunda a sexta). Se indicares um prazo, a app diz se o projecto chega a tempo.</p>
  </section>
 
  <section class="resultado" aria-live="polite">
@@ -82,6 +91,7 @@ footer{font-size:12px;color:#E2EEFF;text-align:center;margin-top:24px}
   <div class="grande" id="rData">-</div>
   <div class="sub" id="rDias"></div>
   <div class="sub" id="rGanho"></div>
+  <div class="prazo" id="rPrazo" hidden></div>
   <div class="acoes">
    <button class="primario" id="btnCopiar">Copiar resultado</button>
    <button class="primario" id="btnCsv">Exportar CSV</button>
@@ -106,7 +116,7 @@ footer{font-size:12px;color:#E2EEFF;text-align:center;margin-top:24px}
 <script>
 // ---------- Estado ----------
 var CHAVE = 'junitec-calendario';
-var estado = { devs: [], tarefas: [], inicio: '', seq: 1 };
+var estado = { devs: [], tarefas: [], inicio: '', prazo: '', seq: 1 };
 
 function hojeISO() { return new Date().toISOString().slice(0, 10); }
 function exemplo() {
@@ -121,14 +131,14 @@ function exemplo() {
       { id: 6, nome: 'Documentação', desc: 'Guia para o cliente', horas: 6, dep: 0 },
       { id: 7, nome: 'Testes finais', desc: 'Testes de aceitação', horas: 8, dep: 5 }
     ],
-    inicio: hojeISO(), seq: 8
+    inicio: hojeISO(), prazo: '', seq: 8
   };
 }
 function guardar() { try { localStorage.setItem(CHAVE, JSON.stringify(estado)); } catch (e) {} }
 function carregar() {
   try {
     var d = JSON.parse(localStorage.getItem(CHAVE));
-    if (d && d.devs && d.tarefas) { estado = d; return; }
+    if (d && d.devs && d.tarefas) { if (!d.prazo) d.prazo = ''; estado = d; return; }
   } catch (e) {}
   exemplo();
 }
@@ -183,6 +193,25 @@ function fmtCurta(d) { return ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 var plano = null;
 
+// ---------- Prazo de entrega ----------
+function diasUteisEntre(a, b) {
+  // Conta os dias úteis depois de a, até b (inclusive). Assume a <= b.
+  var n = 0, d = new Date(a.getTime());
+  while (d < b) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) n++; }
+  return n;
+}
+function textoPrazo(fimData) {
+  // Devolve { ok, texto } ou null se não houver prazo
+  if (!estado.prazo) return null;
+  var p = new Date(estado.prazo + 'T12:00:00');
+  var u = function (n) { return n + (n === 1 ? ' dia útil' : ' dias úteis'); };
+  if (fimData <= p) {
+    var folga = diasUteisEntre(fimData, p);
+    return { ok: true, texto: folga === 0 ? 'Chega a tempo, mesmo em cima do prazo (' + fmt(p) + ').' : 'Chega a tempo, com ' + u(folga) + ' de folga face ao prazo (' + fmt(p) + ').' };
+  }
+  return { ok: false, texto: 'Falha o prazo (' + fmt(p) + ') em ' + u(diasUteisEntre(p, fimData)) + '. Experimenta acrescentar um developer ou reduzir horas.' };
+}
+
 // ---------- Interface: listas ----------
 function desenharDevs() {
   var el = document.getElementById('listaDev'); el.innerHTML = '';
@@ -233,12 +262,16 @@ function desenharResultado() {
   plano = agendar(true);
   var base = agendar(false);
   var dias = Math.ceil(plano.total - 1e-9);
-  var dataEl = document.getElementById('rData');
+  var dataEl = document.getElementById('rData'), pEl = document.getElementById('rPrazo');
+  pEl.hidden = true;
   if (!plano.itens.length) {
     dataEl.textContent = '-'; document.getElementById('rDias').textContent = 'Acrescenta developers com horas por dia e tarefas.';
     document.getElementById('rGanho').textContent = '';
   } else {
-    dataEl.textContent = fmt(dataDoDia(Math.max(dias - 1, 0)));
+    var fimData = dataDoDia(Math.max(dias - 1, 0));
+    dataEl.textContent = fmt(fimData);
+    var vp = textoPrazo(fimData);
+    if (vp) { pEl.hidden = false; pEl.className = 'prazo ' + (vp.ok ? 'ok' : 'mau'); pEl.textContent = vp.texto; }
     document.getElementById('rDias').textContent = dias + (dias === 1 ? ' dia útil' : ' dias úteis') + ' de trabalho';
     var ganho = Math.ceil(base.total - 1e-9) - dias;
     document.getElementById('rGanho').textContent = ganho > 0
@@ -284,6 +317,8 @@ function desenharTudo() { desenharDevs(); desenharTarefas(); desenharResultado()
 // ---------- Exportar ----------
 function textoResultado() {
   var l = ['Conclusão prevista: ' + document.getElementById('rData').textContent + ' (' + document.getElementById('rDias').textContent + ')'];
+  var pz = document.getElementById('rPrazo');
+  if (!pz.hidden) l.push(pz.textContent);
   plano.itens.forEach(function (r, i) {
     l.push((i + 1) + '. ' + r.t.nome + ' - ' + r.dev.nome + ' - ' + fmt(dataDoDia(Math.floor(r.ini + 1e-9))) + ' a ' + fmt(dataDoDia(Math.max(Math.ceil(r.fim - 1e-9) - 1, 0))) + ' - ' + (Number(r.t.horas) || 0) + ' h');
   });
@@ -308,13 +343,15 @@ function exportarCsv() {
 // ---------- Ligações ----------
 document.getElementById('btnDev').onclick = function () { estado.devs.push({ nome: 'Novo developer', hdia: 6 }); desenharTudo(); };
 document.getElementById('btnTar').onclick = function () { estado.tarefas.push({ id: estado.seq++, nome: 'Nova tarefa', desc: '', horas: 4, dep: 0 }); desenharTudo(); };
-document.getElementById('btnExemplo').onclick = function () { exemplo(); document.getElementById('inicio').value = estado.inicio; desenharTudo(); };
+document.getElementById('btnExemplo').onclick = function () { exemplo(); document.getElementById('inicio').value = estado.inicio; document.getElementById('prazo').value = ''; desenharTudo(); };
 document.getElementById('inicio').onchange = function (e) { estado.inicio = e.target.value || hojeISO(); desenharResultado(); };
+document.getElementById('prazo').onchange = function (e) { estado.prazo = e.target.value; desenharResultado(); };
 document.getElementById('btnCopiar').onclick = copiar;
 document.getElementById('btnCsv').onclick = exportarCsv;
 
 carregar();
 document.getElementById('inicio').value = estado.inicio || hojeISO();
+document.getElementById('prazo').value = estado.prazo || '';
 desenharTudo();
 </script>
 </body>
